@@ -1,32 +1,40 @@
 # 构建和发布
 
-## 自动发布测试 APK
+## 统一版本
 
-提交 main 或手动运行 Android build and preview release，会执行检查和编译。通过后在 Releases 自动创建 Pre-release，附上 APK、SHA256SUMS、build-info.txt；不只是上传短期 Actions Artifacts。PR 不触发公开发布。
+应用名称为“轻收 · TVInbox”，当前版本为 `0.1`。版本名称不带额外后缀；标签为 `v0.1`，下载文件为 `TVInbox-v0.1.apk`。
 
-测试包使用 `.debug` applicationId 与 CI debug 签名，不承诺不同构建可以覆盖安装。测试签名冲突时需要卸载旧测试版，其收件箱也会删除。正式更新身份需要自己的固定签名。
+提交 main 或手动运行 Android build and release，执行网页/JVM 测试、Lint、两种构建变体和签名验证。全部通过后自动创建普通 Release，附上 APK、SHA256SUMS、build-info.txt，不只保存短期 Artifacts。
 
-`TVInbox-preview` artifact 保留 14 天；`checks-and-reports` 报告保留 7 天。Releases 附件与 Artifacts 分开保存。
+同一版本已经发布时，不覆盖附件或移动标签。后续修改仅产生 Actions Artifacts；发布下一版本需递增 versionCode，并设置新的 versionName。两段版本如 `0.1` 和三段版本如 `0.1.1` 均受支持。
 
-## 正式固定签名
+TVInbox artifact 保留 14 天，checks-and-reports 保留 7 天；Releases 独立保存。
 
-在可信环境生成并离线备份自己的 release keystore。不要把 keystore、密码或 Base64 内容提交进仓库、聊天、Issue 或构建日志。
+## 当前签名机制
+
+名称调整不变更应用身份。当前自动构建附件沿用 `.debug` applicationId 与 CI 临时签名，不承诺跨构建覆盖安装；签名冲突时卸载原应用会清除其收件箱。此构建方式与固定密钥签名不同。
+
+## 固定签名
+
+在可信环境生成并离线备份 keystore，不把 keystore、密码或 Base64 内容提交进仓库、聊天、Issue 或日志。
 
 配置仓库 Actions Secrets：
 
 | Secret | 含义 |
 |---|---|
-| TVINBOX_KEYSTORE_BASE64 | 固定 release keystore 的 Base64 内容 |
+| TVINBOX_KEYSTORE_BASE64 | 固定 keystore 的 Base64 内容 |
 | TVINBOX_STORE_PASSWORD | keystore 密码 |
 | TVINBOX_KEY_ALIAS | 私钥别名 |
 | TVINBOX_KEY_PASSWORD | 私钥密码 |
 
-工作流只在临时目录还原密钥，用后删除；不自动生成正式私钥。Base64 只是编码，不是加密。
+工作流仅在临时目录还原密钥，用后删除，不自动生成固定私钥。Base64 只是编码，不是加密。
 
-发布前递增 app/build.gradle.kts 的 versionCode，设置 versionName，然后给经过验证的提交打匹配标签，例如 v0.1.0。Signed release 会检查标签、签名 Secrets，运行网页测试、JVM 测试、Lint 和正式包编译，验证签名后自动公开到 Releases。缺少签名信息时失败，不退回测试签名冒充正式版。
+切换固定签名发布前，应停用 android.yml 的自动发布 job，保留检查，避免两套签名流程占用同一标签。递增 versionCode，设置新版本，对经过验证的 main 提交推送匹配的 `vX.Y` 或 `vX.Y.Z` 标签。Signed release 校验标签和 Secrets，执行检查、编译、签名验证后发布 APK。缺少密钥即失败，不回退到其他签名。
 
-所有工作流默认只有 contents: read；仅发布任务授予当前仓库 contents: write。外部 PR 不获得发布权限，也不读取签名密钥。
+固定签名包名为 `io.github.zhshuaii.tvinbox`，与现有自动构建包名不同，两者收件箱互不共享。
 
-## 版本兼容
+工作流默认 contents: read，仅发布任务授予 contents: write。外部 PR 不读取密钥，也不公开发布附件。
 
-当前 targetSdk / compileSdk 固定为 35。升级 SDK 前单独检查局域网、安装及 Activity 生命周期行为，并执行真机回归。
+## SDK 兼容
+
+当前 targetSdk / compileSdk 为 35。升级前检查局域网权限、安装及 Activity 生命周期行为，并完成真机回归。

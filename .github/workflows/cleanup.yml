@@ -1,0 +1,44 @@
+name: Keep main branch
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/cleanup.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: github.repository == 'zhshuaii/TVInbox' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Close branch pull requests and retain only main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GH_REPO" == 'zhshuaii/TVInbox' ]]
+          gh api "repos/$GH_REPO/branches/main" > /dev/null
+          gh api --paginate "repos/$GH_REPO/branches?per_page=100" --jq '.[].name | select(. != "main")' > "$RUNNER_TEMP/branches.txt"
+          gh pr list --repo "$GH_REPO" --state open --limit 100 --json number,headRefName,isCrossRepository > "$RUNNER_TEMP/prs.json"
+          while IFS= read -r branch; do
+            [[ -n "$branch" && "$branch" != 'main' ]]
+            jq -r --arg b "$branch" '.[] | select(.headRefName == $b and .isCrossRepository == false) | .number' "$RUNNER_TEMP/prs.json" > "$RUNNER_TEMP/pr-numbers.txt"
+            while IFS= read -r number; do
+              gh pr close "$number" --repo "$GH_REPO"
+            done < "$RUNNER_TEMP/pr-numbers.txt"
+            encoded="$(jq -rn --arg b "$branch" '$b | @uri')"
+            gh api --method DELETE "repos/$GH_REPO/git/refs/heads/$encoded"
+            printf 'Deleted branch: %s\n' "$branch"
+          done < "$RUNNER_TEMP/branches.txt"
+          gh api --paginate "repos/$GH_REPO/branches?per_page=100" --jq '.[].name' > "$RUNNER_TEMP/remaining.txt"
+          [[ "$(cat "$RUNNER_TEMP/remaining.txt")" == 'main' ]]
+          echo 'Only main remains. Closed associated pull requests without merging their changes.' >> "$GITHUB_STEP_SUMMARY"

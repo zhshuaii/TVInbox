@@ -1,8 +1,12 @@
-name: Android build and preview release
+name: Android build and release
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - '.github/workflows/cleanup.yml'
+      - '.github/dependabot.yml'
   pull_request:
   workflow_dispatch:
 
@@ -36,26 +40,30 @@ jobs:
         run: gradle --no-daemon wrapper --gradle-version 8.11.1 --distribution-type bin
       - name: Check and build both variants
         run: ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug assembleRelease
-      - name: Collect installable preview APK
+      - name: Collect installable APK
         id: metadata
         shell: bash
         run: |
           VERSION="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk "dist/TVInbox-v${VERSION}-preview.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/TVInbox-v${VERSION}.apk"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/*.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging dist/*.apk > "$RUNNER_TEMP/badging.txt"
+          grep -F "versionName='$VERSION'" "$RUNNER_TEMP/badging.txt"
+          if grep -Eiq '(测试版|preview|versionName=.*-debug)' "$RUNNER_TEMP/badging.txt"; then
+            echo 'Unexpected distribution label in APK metadata'; exit 1
+          fi
           (cd dist && sha256sum *.apk > SHA256SUMS)
-          printf 'Commit: %s\nPackage: io.github.zhshuaii.tvinbox.debug\nBuild: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_NUMBER" > dist/build-info.txt
-          echo '## TVInbox preview build' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Installable debug-signed test APK; not a production-signed release.' >> "$GITHUB_STEP_SUMMARY"
-          stat --printf='Preview APK: %s bytes\n' dist/*.apk >> "$GITHUB_STEP_SUMMARY"
-          stat --printf='Minified unsigned release: %s bytes\n' app/build/outputs/apk/release/app-release-unsigned.apk >> "$GITHUB_STEP_SUMMARY"
+          printf 'Commit: %s\nVersion: %s\nPackage: io.github.zhshuaii.tvinbox.debug\nSigning: CI-generated key\nBuild: %s\n' "$GITHUB_SHA" "$VERSION" "$GITHUB_RUN_NUMBER" > dist/build-info.txt
+          echo "## TVInbox $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Signing uses a CI-generated key, not a persistent owner-managed key.' >> "$GITHUB_STEP_SUMMARY"
+          stat --printf='APK: %s bytes\n' dist/*.apk >> "$GITHUB_STEP_SUMMARY"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions dist/*.apk >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: TVInbox-preview
+          name: TVInbox
           path: dist/
           if-no-files-found: error
           retention-days: 14
@@ -77,7 +85,7 @@ jobs:
             app/build/test-results/
           retention-days: 7
 
-  publish-preview:
+  publish:
     needs: build
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
@@ -87,7 +95,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: TVInbox-preview
+          name: TVInbox
           path: dist
       - name: Publish APK to GitHub Releases
         env:
@@ -97,23 +105,32 @@ jobs:
         shell: bash
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
-          TAG="v${VERSION}-preview.${GITHUB_RUN_NUMBER}"
+          TAG="v${VERSION}"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
-          ## 轻收 · TVInbox 测试版
+          ## 轻收 · TVInbox ${VERSION}
           手机扫码上传 APK，电视列表手动安装、删除和清空。上传不会自动安装。
 
-          下载附件 TVInbox-v${VERSION}-preview.apk；Source code 附件不是安装包。
+          下载附件 TVInbox-v${VERSION}.apk；Source code 附件不是安装包。
           配套 SHA256SUMS 可校验文件，build-info.txt 记录源码提交。
 
-          **此包使用 CI 测试签名，包名 io.github.zhshuaii.tvinbox.debug。**
-          不同构建之间可能需要先卸载旧测试版，卸载会清除该应用的收件箱。
-          正式签名版本需由仓库所有者配置固定签名密钥后发布。
-          编译和自动检查不能代替真实电视安装、遥控器和手机浏览器验收。
+          版本号：${VERSION}。应用名称：轻收 · TVInbox。
+          当前附件沿用包名 io.github.zhshuaii.tvinbox.debug 和 CI 临时签名；本次名称调整不改变签名机制。
+          跨构建覆盖安装可能遇到签名冲突；卸载原应用会清除该应用的收件箱。
+          遥控器、手机浏览器和系统安装器兼容性仍需真机验收。
 
           Commit: ${GITHUB_SHA}
           EOF
           if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/* --repo "$GH_REPO" --clobber
+            echo "Release $TAG already exists; keeping its source tag and assets unchanged." >> "$GITHUB_STEP_SUMMARY"
+            echo 'This build is available in Actions Artifacts. Increment the version to publish another release.' >> "$GITHUB_STEP_SUMMARY"
           else
-            gh release create "$TAG" dist/* --repo "$GH_REPO" --target "$GITHUB_SHA" --prerelease --latest=false --title "轻收 TVInbox ${TAG}" --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release create "$TAG" dist/* --repo "$GH_REPO" --target "$GITHUB_SHA" --latest --title "轻收 · TVInbox ${VERSION}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+          # Remove only the superseded release explicitly covered by this rename.
+          # The new release must exist with its APK before removing the old one.
+          if [[ "$VERSION" == '0.1' ]]; then
+            gh release view "$TAG" --repo "$GH_REPO" --json assets --jq '.assets[].name' | grep -Fx "TVInbox-v${VERSION}.apk"
+            if gh release view v0.1.0-preview.8 --repo "$GH_REPO" >/dev/null 2>&1; then
+              gh release delete v0.1.0-preview.8 --repo "$GH_REPO" --yes --cleanup-tag
+            fi
           fi
