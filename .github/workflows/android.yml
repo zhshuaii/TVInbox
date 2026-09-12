@@ -105,6 +105,11 @@ jobs:
         shell: bash
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
+          MAIN_SHA="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$MAIN_SHA" != "$GITHUB_SHA" ]]; then
+            echo '::error::main advanced after this build. Run the workflow from the current main before publishing.'
+            exit 1
+          fi
           TAG="v${VERSION}"
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           ## 轻收 · TVInbox ${VERSION}
