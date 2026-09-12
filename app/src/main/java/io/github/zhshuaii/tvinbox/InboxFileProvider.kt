@@ -9,6 +9,6 @@ import java.io.FileNotFoundException
 class InboxFileProvider : FileProvider() {
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         if (mode != "r") throw FileNotFoundException("Read-only APK provider")
-        return super.openFile(uri, mode)
+        return super.openFile(uri, mode) ?: throw FileNotFoundException("Unable to open requested APK")
     }
 }
