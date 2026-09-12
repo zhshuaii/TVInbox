@@ -1,40 +1,40 @@
-# 构建和发布
+# 构建与固定签名
 
-## 统一版本
+应用名称为 **轻收**，项目名 TVInbox。当前版本 `0.1`、versionCode `3`，发布包名 `io.github.zhshuaii.tvinbox`，附件 `TVInbox-v0.1.apk`。
 
-应用名称为“轻收 · TVInbox”，当前版本为 `0.1`。版本名称不带额外后缀；标签为 `v0.1`，下载文件为 `TVInbox-v0.1.apk`。
+## 一次性配置
 
-提交 main 或手动运行 Android build and release，执行网页/JVM 测试、Lint、两种构建变体和签名验证。全部通过后自动创建普通 Release，附上 APK、SHA256SUMS、build-info.txt，不只保存短期 Artifacts。
+固定 RSA-4096 私钥已经生成，不需要再次生成。私有备份由仓库所有者单独保管，仓库仅保存公钥证书的 SHA-256 指纹。
 
-同一版本已经发布时，不覆盖附件或移动标签。后续修改仅产生 Actions Artifacts；发布下一版本需递增 versionCode，并设置新的 versionName。两段版本如 `0.1` 和三段版本如 `0.1.1` 均受支持。
+在仓库 Settings → Secrets and variables → Actions → New repository secret 创建 **TVINBOX_SIGNING_BUNDLE**，值为私有备份中 `TVINBOX_SIGNING_BUNDLE.txt` 的完整内容。只需这一个 Secret。
 
-TVInbox artifact 保留 14 天，checks-and-reports 保留 7 天；Releases 独立保存。
+该文件是包含 PKCS12 密钥及密码的 Base64 编码包；Base64 不是加密。不能粘贴到聊天、Issue、README、普通 Actions 输入框或公开日志，也不能上传到仓库或 Releases。备份 ZIP 同样包含私钥和密码，需要离线安全保存。
 
-## 当前签名机制
+保存后到 Actions → Android build and release → Run workflow，选择 main。新增 Secret 本身不会触发构建。
 
-名称调整不变更应用身份。当前自动构建附件沿用 `.debug` applicationId 与 CI 临时签名，不承诺跨构建覆盖安装；签名冲突时卸载原应用会清除其收件箱。此构建方式与固定密钥签名不同。
+也可以在已授权的 GitHub CLI 中读取本地文件，无需把内容写入命令历史：
 
-## 固定签名
+```sh
+gh secret set TVINBOX_SIGNING_BUNDLE --repo zhshuaii/TVInbox < TVINBOX_SIGNING_BUNDLE.txt
+gh workflow run android.yml --repo zhshuaii/TVInbox --ref main
+```
 
-在可信环境生成并离线备份 keystore，不把 keystore、密码或 Base64 内容提交进仓库、聊天、Issue 或日志。
+## 构建与发布规则
 
-配置仓库 Actions Secrets：
+只有 `.github/workflows/android.yml` 一条流水线。先做网页、签名脚本、JVM、Lint 检查并编译 unsigned Release，再在独立 job 中还原固定密钥、校验真实证书、执行 zipalign/apksigner、验证签名与证书指纹，最后发布到 Releases。
 
-| Secret | 含义 |
-|---|---|
-| TVINBOX_KEYSTORE_BASE64 | 固定 keystore 的 Base64 内容 |
-| TVINBOX_STORE_PASSWORD | keystore 密码 |
-| TVINBOX_KEY_ALIAS | 私钥别名 |
-| TVINBOX_KEY_PASSWORD | 私钥密码 |
+密钥只传给签名步骤，不传给 Gradle；在临时私有目录使用，用后清理，不进入缓存或构建附件。固定指纹不匹配即拒绝签名。缺少 Secret 时保留编译报告并明确提示未发布，不使用临时生成的密钥兜底。
 
-工作流仅在临时目录还原密钥，用后删除，不自动生成固定私钥。Base64 只是编码，不是加密。
+只在本仓库 main 的 push / workflow_dispatch 上读取 Secret；PR 不读取签名密钥。官方 Actions 固定到完整提交 SHA。上传附件仅为 APK、SHA256SUMS、build-info.txt，不包含私钥。
 
-切换固定签名发布前，应停用 android.yml 的自动发布 job，保留检查，避免两套签名流程占用同一标签。递增 versionCode，设置新版本，对经过验证的 main 提交推送匹配的 `vX.Y` 或 `vX.Y.Z` 标签。Signed release 校验标签和 Secrets，执行检查、编译、签名验证后发布 APK。缺少密钥即失败，不回退到其他签名。
+## 0.1 迁移
 
-固定签名包名为 `io.github.zhshuaii.tvinbox`，与现有自动构建包名不同，两者收件箱互不共享。
+此轮按用户要求保留版本 0.1。一旦固定签名验证通过，允许替换原 v0.1（原标签提交 51002951a20ed93f56441eeaaa5968645157dc55）的附件及标签，Release 名称改为“轻收 0.1”。其他已发布版本一律不自动覆盖。
 
-工作流默认 contents: read，仅发布任务授予 contents: write。外部 PR 不读取密钥，也不公开发布附件。
+未配置 Secret 或签名失败时，不触碰原 v0.1。完成迁移后，新版本需要递增 versionCode 并修改 versionName。已发布且对应同一提交时不重复覆盖；不同提交复用同一版本会被拒绝。
 
-## SDK 兼容
+旧包名 io.github.zhshuaii.tvinbox.debug 与新包名不同，可以并存，收件箱不共享。后续使用新包名和同一固定密钥覆盖更新。不要丢失或重新生成密钥。
 
-当前 targetSdk / compileSdk 为 35。升级前检查局域网权限、安装及 Activity 生命周期行为，并完成真机回归。
+## 工具链
+
+JDK 17、Gradle 8.11.1、AGP 8.9.2、Kotlin 2.1.21、Android SDK/targetSdk 35、Build Tools 35.0.0。升级前完成局域网、安装器及生命周期的真机回归。

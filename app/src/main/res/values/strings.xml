@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">轻收 · TVInbox</string>
+    <string name="app_name">轻收</string>
     <string name="subtitle">电视 APK 收件箱</string>
     <string name="scan">手机扫码上传 APK</string>
     <string name="same_lan">手机与电视需在同一局域网</string>

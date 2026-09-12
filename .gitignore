@@ -6,6 +6,14 @@ local.properties
 *.iml
 *.jks
 *.keystore
+*.p12
+*.pfx
+*.key
+TVINBOX_SIGNING_BUNDLE.txt
+signing-info.json
+*signing-private*.zip
 *.apk
 *.aab
+__pycache__/
+*.pyc
 .DS_Store

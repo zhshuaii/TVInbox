@@ -11,31 +11,15 @@ android {
         applicationId = "io.github.zhshuaii.tvinbox"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
+        versionCode = 3
         versionName = "0.1"
     }
 
-    val releaseKeystore = System.getenv("TVINBOX_KEYSTORE_PATH")
-    if (!releaseKeystore.isNullOrBlank()) {
-        signingConfigs.create("release") {
-            storeFile = file(releaseKeystore)
-            storePassword = System.getenv("TVINBOX_STORE_PASSWORD")
-            keyAlias = System.getenv("TVINBOX_KEY_ALIAS")
-            keyPassword = System.getenv("TVINBOX_KEY_PASSWORD")
-        }
-    }
-
     buildTypes {
-        debug {
-            applicationIdSuffix = ".debug"
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (!releaseKeystore.isNullOrBlank()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
         }
     }
 
