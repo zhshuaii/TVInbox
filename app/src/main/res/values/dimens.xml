@@ -1,0 +1,5 @@
+<resources>
+    <dimen name="screen_padding">18dp</dimen>
+    <dimen name="connection_width">236dp</dimen>
+    <dimen name="qr_size">128dp</dimen>
+</resources>

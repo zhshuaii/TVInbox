@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="@dimen/screen_padding" android:background="#101722">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical">
+        <ImageView android:layout_width="40dp" android:layout_height="40dp" android:src="@drawable/ic_inbox" android:importantForAccessibility="no" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:text="@string/app_name" android:textSize="26sp" android:textStyle="bold" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="16dp" android:text="@string/subtitle" android:textSize="14sp" android:textColor="#ADB9CB" />
+        <Button android:id="@+id/exit_button" style="@style/ActionButton" android:layout_width="76dp" android:layout_height="44dp" android:text="@string/exit" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="16dp" android:baselineAligned="false">
+        <LinearLayout android:layout_width="@dimen/connection_width" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_horizontal" android:padding="16dp" android:background="@drawable/panel_background">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/scan" android:textSize="19sp" android:textStyle="bold" />
+            <ImageView android:id="@+id/qr_image" android:layout_width="@dimen/qr_size" android:layout_height="@dimen/qr_size" android:layout_marginTop="12dp" android:layout_marginBottom="12dp" android:contentDescription="@string/qr_description" />
+            <TextView android:id="@+id/address" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:textSize="13sp" android:textColor="#72B2FF" android:maxLines="2" />
+            <TextView android:id="@+id/server_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:text="@string/starting" android:textSize="14sp" />
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:gravity="center" android:text="@string/same_lan" android:textColor="#ADB9CB" android:textSize="12sp" />
+            <Space android:layout_width="1dp" android:layout_height="0dp" android:layout_weight="1" />
+            <Button android:id="@+id/retry_button" style="@style/ActionButton" android:layout_width="match_parent" android:layout_height="44dp" android:text="@string/retry" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:layout_marginStart="16dp" android:orientation="vertical" android:padding="16dp" android:background="@drawable/panel_background">
+            <TextView android:id="@+id/list_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/apk_list" android:textSize="19sp" android:textStyle="bold" />
+            <TextView android:id="@+id/upload_status" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#72B2FF" android:textSize="13sp" android:visibility="gone" />
+            <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="8dp" android:fillViewport="true" android:descendantFocusability="afterDescendants">
+                <LinearLayout android:id="@+id/apk_rows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
+            </ScrollView>
+            <TextView android:id="@+id/storage_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textSize="13sp" android:textColor="#ADB9CB" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/retention" android:textSize="11sp" android:textColor="#ADB9CB" />
+                <Button android:id="@+id/clear_button" style="@style/ActionButton" android:layout_width="124dp" android:layout_height="44dp" android:text="@string/clear" android:textColor="#FFA8A8" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="@string/manual_only" android:textSize="12sp" android:textColor="#ADB9CB" />
+</LinearLayout>

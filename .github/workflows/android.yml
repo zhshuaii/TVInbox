@@ -1,0 +1,119 @@
+name: Android build and preview release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install pinned Android SDK packages
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"'
+      - name: Check mobile web behavior
+        run: node --test scripts/test-web.mjs
+      - name: Generate official Gradle wrapper
+        run: gradle --no-daemon wrapper --gradle-version 8.11.1 --distribution-type bin
+      - name: Check and build both variants
+        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug assembleRelease
+      - name: Collect installable preview APK
+        id: metadata
+        shell: bash
+        run: |
+          VERSION="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)".*/\1/p' app/build.gradle.kts)"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/TVInbox-v${VERSION}-preview.apk"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/*.apk
+          (cd dist && sha256sum *.apk > SHA256SUMS)
+          printf 'Commit: %s\nPackage: io.github.zhshuaii.tvinbox.debug\nBuild: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_NUMBER" > dist/build-info.txt
+          echo '## TVInbox preview build' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Installable debug-signed test APK; not a production-signed release.' >> "$GITHUB_STEP_SUMMARY"
+          stat --printf='Preview APK: %s bytes\n' dist/*.apk >> "$GITHUB_STEP_SUMMARY"
+          stat --printf='Minified unsigned release: %s bytes\n' app/build/outputs/apk/release/app-release-unsigned.apk >> "$GITHUB_STEP_SUMMARY"
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions dist/*.apk >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TVInbox-preview
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gradle-wrapper
+          path: |
+            gradlew
+            gradlew.bat
+            gradle/wrapper/
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checks-and-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          retention-days: 7
+
+  publish-preview:
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: TVInbox-preview
+          path: dist
+      - name: Publish APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        shell: bash
+        run: |
+          (cd dist && sha256sum --check SHA256SUMS)
+          TAG="v${VERSION}-preview.${GITHUB_RUN_NUMBER}"
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          ## 轻收 · TVInbox 测试版
+          手机扫码上传 APK，电视列表手动安装、删除和清空。上传不会自动安装。
+
+          下载附件 TVInbox-v${VERSION}-preview.apk；Source code 附件不是安装包。
+          配套 SHA256SUMS 可校验文件，build-info.txt 记录源码提交。
+
+          **此包使用 CI 测试签名，包名 io.github.zhshuaii.tvinbox.debug。**
+          不同构建之间可能需要先卸载旧测试版，卸载会清除该应用的收件箱。
+          正式签名版本需由仓库所有者配置固定签名密钥后发布。
+          编译和自动检查不能代替真实电视安装、遥控器和手机浏览器验收。
+
+          Commit: ${GITHUB_SHA}
+          EOF
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$GH_REPO" --clobber
+          else
+            gh release create "$TAG" dist/* --repo "$GH_REPO" --target "$GITHUB_SHA" --prerelease --latest=false --title "轻收 TVInbox ${TAG}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi

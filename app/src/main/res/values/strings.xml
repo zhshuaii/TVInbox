@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">轻收 · TVInbox</string>
+    <string name="subtitle">电视 APK 收件箱</string>
+    <string name="scan">手机扫码上传 APK</string>
+    <string name="same_lan">手机与电视需在同一局域网</string>
+    <string name="starting">正在启动接收服务…</string>
+    <string name="apk_list">安装包列表</string>
+    <string name="empty">还没有安装包\n扫码上传后会出现在这里</string>
+    <string name="retention">最多 10 个 · 512 MiB · 保留 7 天</string>
+    <string name="manual_only">上传后不自动安装，请用遥控器选择安装。</string>
+    <string name="clear">清空安装包</string>
+    <string name="exit">退出</string>
+    <string name="retry">重新连接</string>
+    <string name="install">安装</string>
+    <string name="delete">删除</string>
+    <string name="cancel">取消</string>
+    <string name="qr_description">局域网上传页面二维码</string>
+</resources>
