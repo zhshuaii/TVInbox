@@ -53,14 +53,14 @@ jobs:
           stat --printf='Preview APK: %s bytes\n' dist/*.apk >> "$GITHUB_STEP_SUMMARY"
           stat --printf='Minified unsigned release: %s bytes\n' app/build/outputs/apk/release/app-release-unsigned.apk >> "$GITHUB_STEP_SUMMARY"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions dist/*.apk >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TVInbox-preview
           path: dist/
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gradle-wrapper
           path: |
@@ -68,7 +68,7 @@ jobs:
             gradlew.bat
             gradle/wrapper/
           retention-days: 14
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: checks-and-reports
